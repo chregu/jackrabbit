@@ -65,6 +65,9 @@ public class Namespace {
     }
 
     public boolean isSame(String namespaceURI) {
+        if (namespaceURI == null && uri == "") {
+            return true;
+        }
         return uri.equals(namespaceURI);
     }
 
