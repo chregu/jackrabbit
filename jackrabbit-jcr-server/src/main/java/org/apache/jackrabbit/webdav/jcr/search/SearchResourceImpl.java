@@ -108,7 +108,7 @@ public class SearchResourceImpl implements SearchResource {
                 ms.setResponseDescription(encode(result.getColumnNames()));
             }
 
-            queryResultToMultiStatus(result, ms);
+            queryResultToMultiStatus(result, ms, sInfo);
 
             return ms;
         } catch (RepositoryException e) {
@@ -208,7 +208,7 @@ public class SearchResourceImpl implements SearchResource {
      * Webdav compatible form.
      * @throws RepositoryException if an error occurs.
      */
-    private void queryResultToMultiStatus(QueryResult result, MultiStatus ms)
+    private void queryResultToMultiStatus(QueryResult result, MultiStatus ms, SearchInfo sInfo)
             throws RepositoryException {
         List<String> columnNames = new ArrayList<String>();
 
@@ -236,6 +236,12 @@ public class SearchResourceImpl implements SearchResource {
         String[] selectorNames = createSelectorNames(descr);
         String[] colNames = columnNames.toArray(new String[columnNames.size()]);
         RowIterator rowIter = result.getRows();
+        if (sInfo.getCount() == 1) {
+            MultiStatusResponse resp = new MultiStatusResponse("#count", String.valueOf(rowIter.getSize()));
+            ms.addResponse(resp);
+            return;
+
+        }
         while (rowIter.hasNext()) {
             Row row = rowIter.nextRow();
             List<Value> values = new ArrayList<Value>();

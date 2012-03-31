@@ -63,10 +63,13 @@ public class SearchInfo implements SearchConstants, XmlSerializable {
 
     public static final long NRESULTS_UNDEFINED = -1;
     public static final long OFFSET_UNDEFINED = -1;
+    public static final long COUNT_UNDEFINED = -1;
+
 
     private static final String LIMIT = "limit";
     private static final String NRESULTS = "nresults";
     private static final String OFFSET = "offset";
+    private static final String COUNT = "count";
 
     /**
      * Set of namespace uri String which are ignored in the search request.
@@ -88,6 +91,7 @@ public class SearchInfo implements SearchConstants, XmlSerializable {
 
     private long nresults = NRESULTS_UNDEFINED;
     private long offset = OFFSET_UNDEFINED;
+    private long count = COUNT_UNDEFINED;
 
     /**
      * Create a new <code>SearchInfo</code> instance.
@@ -188,6 +192,14 @@ public class SearchInfo implements SearchConstants, XmlSerializable {
         this.offset = offset;
     }
 
+    
+    public void setCount(long count) {
+        this.count = count;
+    }
+ 
+    public long getCount() {
+        return count;
+    }
     /**
      * Return the xml representation of this <code>SearchInfo</code> instance.
      *
@@ -264,6 +276,15 @@ public class SearchInfo implements SearchConstants, XmlSerializable {
                 } catch (NumberFormatException e) {
                     log.error("'offset' cannot be parsed into a long -> ignore.");
                 }
+            }
+        }
+        // try of an count is defined within the DAV:limit element.
+        String count = DomUtil.getChildTextTrim(searchRequest, COUNT, NAMESPACE);
+        if (count != null) {
+            try {
+                sInfo.setCount(Long.valueOf(count));
+            } catch (NumberFormatException e) {
+                log.error("'count' cannot be parsed into a long -> ignore.");
             }
         }
         return sInfo;
