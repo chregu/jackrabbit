@@ -493,6 +493,11 @@ public class SharedItemStateManager
     class Update implements org.apache.jackrabbit.core.cluster.Update {
 
         /**
+         * Attribute name used to store the size of the update.
+         */
+        private static final String ATTRIBUTE_UPDATE_SIZE = "updateSize";
+
+        /**
          * Local change log.
          */
         private final ChangeLog local;
@@ -650,7 +655,7 @@ public class SharedItemStateManager
                                             return ntReg.getEffectiveNodeType(ntName);
                                         }
 
-                                        protected NodeState getNodeState(NodeId id)
+                                        public NodeState getNodeState(NodeId id)
                                                 throws ItemStateException {
                                             if (local.has(id)) {
                                                 return (NodeState) local.get(id);
@@ -768,6 +773,7 @@ public class SharedItemStateManager
                 /* Store items in the underlying persistence manager */
                 long t0 = System.currentTimeMillis();
                 persistMgr.store(shared);
+                setAttribute(ATTRIBUTE_UPDATE_SIZE, shared.getUpdateSize());
                 succeeded = true;
                 if (log.isDebugEnabled()) {
                     long t1 = System.currentTimeMillis();
@@ -805,8 +811,10 @@ public class SharedItemStateManager
                 // always gets released, even if a post-store() exception
                 // is thrown from the code above. See also JCR-2272.
                 String path = events.getSession().getUserID()
-                        + "@" + events.getCommonPath();
+                        + "@" + events.getSession().getWorkspace().getName()
+                        + ":" + events.getCommonPath();
                 eventChannel.updateCommitted(this, path);
+                setAttribute(ATTRIBUTE_UPDATE_SIZE, null);
 
                 if (writeLock != null) {
                     // exception occurred before downgrading lock
@@ -1312,7 +1320,7 @@ public class SharedItemStateManager
                 }
 
                 if (!(parentId == null && oldParentId == null)
-                        && !parentId.equals(oldParentId)) {
+                        && (parentId != null && !parentId.equals(oldParentId))) {
                     // This node (not the root) has been moved; check
                     // whether the parent has been modified as well
                     if (changeLog.has(parentId)) {
@@ -1397,7 +1405,7 @@ public class SharedItemStateManager
             if (sharedSet.contains(expectedParent)) {
                 return;
             }
-            String message = "Child node has another parent id " + parentId + ", expected " + expectedParent;
+            String message = "Child node " + childState.getId() + " has another parent id " + parentId + ", expected " + expectedParent;
             log.error(message);
             throw new ItemStateException(message);
         }

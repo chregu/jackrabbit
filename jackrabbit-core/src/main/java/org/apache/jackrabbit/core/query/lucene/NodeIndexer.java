@@ -62,7 +62,7 @@ public class NodeIndexer {
     /**
      * The default boost for a lucene field: 1.0f.
      */
-    protected static final float DEFAULT_BOOST = 1.0f;
+    protected static final float DEFAULT_BOOST = IndexingConfiguration.DEFAULT_BOOST;
 
     /**
      * The <code>NodeState</code> of the node to index
@@ -217,9 +217,11 @@ public class NodeIndexer {
             // parent UUID
             if (node.getParentId() == null) {
                 // root node
-                doc.add(new Field(FieldNames.PARENT, false, "",
+                Field parent = new Field(FieldNames.PARENT, false, "",
                         Field.Store.YES, Field.Index.NOT_ANALYZED_NO_NORMS,
-                        Field.TermVector.NO));
+                        Field.TermVector.NO);
+                parent.setOmitTermFreqAndPositions(true);
+                doc.add(parent);
                 addNodeName(doc, "", "");
             } else if (node.getSharedSet().isEmpty()) {
                 addParentChildRelation(doc, node.getParentId());
@@ -447,7 +449,7 @@ public class NodeIndexer {
                             Metadata.CONTENT_ENCODING, encoding.getString());
                 }
 
-                doc.add(createFulltextField(internalValue, metadata));
+                doc.add(createFulltextField(internalValue, metadata, false));
             }
         } catch (Throwable t) {
             // TODO: How to recover from a transient indexing failure?
@@ -731,15 +733,18 @@ public class NodeIndexer {
             int idx = fieldName.indexOf(':');
             fieldName = fieldName.substring(0, idx + 1)
                     + FieldNames.FULLTEXT_PREFIX + fieldName.substring(idx + 1);
+            boolean hasNorms = boost != DEFAULT_BOOST;
+            Field.Index indexType = hasNorms ? Field.Index.ANALYZED
+                    : Field.Index.ANALYZED_NO_NORMS;
             Field f = new Field(fieldName, true, internalValue, Field.Store.NO,
-                    Field.Index.ANALYZED, Field.TermVector.NO);
+                    indexType, Field.TermVector.NO);
             f.setBoost(boost);
             doc.add(f);
 
             if (includeInNodeIndex) {
                 // also create fulltext index of this value
                 boolean store = supportHighlighting && useInExcerpt;
-                f = createFulltextField(internalValue, store, supportHighlighting);
+                f = createFulltextField(internalValue, store, supportHighlighting, hasNorms);
                 if (useInExcerpt) {
                     doc.add(f);
                 } else {
@@ -775,10 +780,25 @@ public class NodeIndexer {
      *
      * @param value the string value.
      * @return a lucene field.
-     * @deprecated use {@link #createFulltextField(String, boolean, boolean)} instead.
+     * @deprecated use {@link #createFulltextField(String, boolean, boolean, boolean)} instead.
      */
     protected Field createFulltextField(String value) {
         return createFulltextField(value, supportHighlighting, supportHighlighting);
+    }
+
+    /**
+     * Creates a fulltext field for the string <code>value</code>.
+     * 
+     * @param value the string value.
+     * @param store if the value of the field should be stored.
+     * @param withOffsets if a term vector with offsets should be stored.
+     * @return a lucene field.
+     * @deprecated use {@link #createFulltextField(String, boolean, boolean, boolean)} instead.
+     */
+    protected Field createFulltextField(String value,
+                                        boolean store,
+                                        boolean withOffsets) {
+        return createFulltextField(value, store, withOffsets, true);
     }
 
     /**
@@ -787,26 +807,34 @@ public class NodeIndexer {
      * @param value the string value.
      * @param store if the value of the field should be stored.
      * @param withOffsets if a term vector with offsets should be stored.
+     * @param withNorms if norm information should be added for this value
      * @return a lucene field.
      */
     protected Field createFulltextField(String value,
                                         boolean store,
-                                        boolean withOffsets) {
+                                        boolean withOffsets,
+                                        boolean withNorms) {
         Field.TermVector tv;
         if (withOffsets) {
             tv = Field.TermVector.WITH_OFFSETS;
         } else {
             tv = Field.TermVector.NO;
         }
+        Field.Index index;
+        if (withNorms) {
+            index = Field.Index.ANALYZED;
+        } else {
+            index = Field.Index.ANALYZED_NO_NORMS;
+        }
         if (store) {
             // We would be able to store the field compressed or not depending
             // on a criterion but then we could not determine later is this field
             // has been compressed or not, so we choose to store it uncompressed
             return new Field(FieldNames.FULLTEXT, false, value, Field.Store.YES,
-                    Field.Index.ANALYZED, tv);
+                    index, tv);
         } else {
             return new Field(FieldNames.FULLTEXT, false, value,
-                    Field.Store.NO, Field.Index.ANALYZED, tv);
+                    Field.Store.NO, index, tv);
         }
     }
 
@@ -816,12 +844,25 @@ public class NodeIndexer {
      * @param value the binary value
      * @param metadata document metatadata
      * @return a lucene field.
+     * @deprecated use {@link #createFulltextField(InternalValue, Metadata, boolean)} instead.
      */
     protected Fieldable createFulltextField(
             InternalValue value, Metadata metadata) {
-        return new LazyTextExtractorField(
-                parser, value, metadata, executor,
-                supportHighlighting, getMaxExtractLength());
+        return createFulltextField(value, metadata, true);
+    }
+
+    /**
+     * Creates a fulltext field for the reader <code>value</code>.
+     *
+     * @param value the binary value
+     * @param metadata document metatadata
+     * @param withNorms if norm information should be added for this value
+     * @return a lucene field.
+     */
+    protected Fieldable createFulltextField(
+            InternalValue value, Metadata metadata, boolean withNorms) {
+        return new LazyTextExtractorField(parser, value, metadata, executor,
+                supportHighlighting, getMaxExtractLength(), withNorms);
     }
 
     /**
@@ -955,9 +996,11 @@ public class NodeIndexer {
     protected void addParentChildRelation(Document doc,
                                           NodeId parentId)
             throws ItemStateException, RepositoryException {
-        doc.add(new Field(FieldNames.PARENT, false, parentId.toString(),
-                Field.Store.YES, Field.Index.NOT_ANALYZED_NO_NORMS,
-                Field.TermVector.NO));
+        Field parentField = new Field(FieldNames.PARENT, false,
+                parentId.toString(), Field.Store.YES,
+                Field.Index.NOT_ANALYZED_NO_NORMS, Field.TermVector.NO);
+        parentField.setOmitTermFreqAndPositions(true);
+        doc.add(parentField);
         NodeState parent = (NodeState) stateProvider.getItemState(parentId);
         ChildNodeEntry child = parent.getChildNodeEntry(node.getNodeId());
         if (child == null) {

@@ -14,15 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.jackrabbit.core.query.lucene;
+package org.apache.jackrabbit.core.stats;
 
-import org.apache.jackrabbit.test.ConcurrentTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Test suite that includes all testcases for the Search module.
+ * Test suite that includes all test cases for the stats module.
  */
 public class TestAll extends TestCase {
 
@@ -34,17 +33,10 @@ public class TestAll extends TestCase {
      *         package.
      */
     public static Test suite() {
-        TestSuite suite = new ConcurrentTestSuite("Search tests");
+        TestSuite suite = new TestSuite("Stats tests");
 
-        suite.addTestSuite(IndexingQueueTest.class);
-        suite.addTestSuite(DecimalConvertTest.class);
-        suite.addTestSuite(IndexingAggregateTest.class);
-        suite.addTestSuite(IndexMigrationTest.class);
-        suite.addTestSuite(ChainedTermEnumTest.class);
-        suite.addTestSuite(IndexingConfigurationImplTest.class);
-        suite.addTestSuite(SQL2IndexingAggregateTest.class);
-        suite.addTestSuite(SQL2IndexingAggregateTest2.class);
-        suite.addTestSuite(LazyTextExtractorFieldTest.class);
+        suite.addTestSuite(RepositoryStatisticsImplTest.class);
+        suite.addTestSuite(TimeSeriesRecorderTest.class);
 
         return suite;
     }
